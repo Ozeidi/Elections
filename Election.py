@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-import requests
-import json
-import codecs
-import time
-import os
+import requests,json, codecs, time, os
 def consolidate():
     Consolidated= codecs.open('{}\output\consolidated1.txt'.format(os.getcwd()),'wb','utf-8')
     for w_id in range(1,62,1):
@@ -18,10 +14,10 @@ def consolidate():
 
 def main():
 
-    for w_id in range(1,3,1):
+    for w_id in range(1,62,1):
         records_per_page=2000
         root_url="https://election.gov.om/election-service/api/Voter/GetRegisteredVoterFinalList/{0}".format(w_id)
-        path='{0}\output\{1}.txt'.format(os.getcwd(),w_id)
+        path='{0}\output\{1}a.txt'.format(os.getcwd(),w_id)
         Output=codecs.open(path,'wb','utf-8')
         
         Output.write('row_no;wilaya_id;name')
