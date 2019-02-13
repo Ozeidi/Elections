@@ -7,19 +7,26 @@
 #    http://shiny.rstudio.com/
 #
 #install.packages('leaflet')
-
+#install.packages('leaflet.extras')
 Sys.setlocale("LC_CTYPE", locale="Arabic")
 library(shiny)
 library(leaflet)
 library(tidyverse)
+library(leaflet.extras)
 #needed for color palette
 library(RColorBrewer)
-Address <- read.csv('geocoded.csv')
-df <- Address
+# df_geocode <- read.csv('geocoded.csv')
+# df_geocode$w <- as.character(df_geocode$w)
+# df <- readxl::read_xlsx('E:/Misc/01. Tech/01. Programing/03. Projects/04. Election Analysis/Scraper/spiders/output/sheet.xlsx',
+#                        sheet = 'Sheet1')
+# df %>%  group_by(w,wilaya_id,Surname_neutral) %>%  summarise(n())  %>%  arrange(desc(`n()`)) %>% rename(n = `n()`) -> df_grouped
+# 
+# merge(x = df_grouped, y= df_geocode) -> df
+df_slice <- df
 ui<-navbarPage("Interactive App", id="nav",
                
                
-               tabPanel("Gumtree Watcher",
+               tabPanel("Tribal Distribution",
                         div(class="outer",
                             tags$head(
                               # Include custom CSS inspired by :https://shiny.rstudio.com/gallery/superzip-example.html
@@ -32,9 +39,9 @@ ui<-navbarPage("Interactive App", id="nav",
                                           draggable = FALSE, top = 60, left =20 , right = "auto", bottom = "auto",
                                           width = 330, height = "auto",
 
-                                          h2("Australia Car Watcher"),
+                                          h2("Tribal Distribution"),
                                           checkboxInput(inputId = 'inCluster',label = "Enable proximity clustering",value=TRUE),
-                                          selectInput(inputId = 'inMake',label = 'Car maker:',choices = c('All',as.character(sort(df$w))), selected = 'All'),
+                                          selectInput(inputId = 'inTribe',label = 'Tribe:',choices = c('All',as.character(sort(unique(df$Surname_neutral),decreasing = F))), selected = 'All'),
                                           conditionalPanel("input.inMake != 'All'",
                                                            selectInput(inputId = 'inModel',label = 'Car Model:',choices = "")),
                                           sliderInput(inputId = 'inYear',label="Manufacturing Year",min=1900,max=2017,value=c(1900,2017)),
@@ -92,38 +99,29 @@ server<-function(input, output,session) {
   ))
   #draw leaflet map based on lat-lon bounds in the data
   output$plotmap <- renderLeaflet({
-    leaflet(data = df) %>% addTiles(group = "OSM (default)") %>%
-      addProviderTiles(providers$Stamen.Toner, group = "Toner") %>%
-      addProviderTiles(providers$Stamen.TonerLite, group = "Toner Lite") %>%
+    leaflet(data = df) %>% addProviderTiles(providers$CartoDB.DarkMatter) %>%
       # add option to select map layout
       addLayersControl(
         baseGroups = c("OSM (default)", "Toner", "Toner Lite"),
-        options = layersControlOptions(collapsed = TRUE)
-      ) %>%
+        options = layersControlOptions(collapsed = TRUE)) %>%
       fitBounds(~min(Lon), ~min(Lat), ~max(Lon), ~max(Lat))
   })  
   # #function Filter the data based on user selection
-  # df_slice<-reactive({
-  #   bounds <- input$plotmap_bounds
-  #   latRng <- range(bounds$north, bounds$south)
-  #   LonRng <- range(bounds$east, bounds$west)
-  #   
-  #   if (input$inMake=='All' ){
-  #     slice<-subset(df,Lat >= latRng[1] & Lat <= latRng[2] &
-  #                     Lon >= LonRng[1] & Lon <= LonRng[2] &
-  #                     Year>= input$inYear[1] & Year<= input$inYear[2] &
-  #                     Price>=(input$inPrice[1]*1000) & Price<=(input$inPrice[2]*1000))
-  #   }else if (input$inMake!='All' & input$inModel=='All'){
-  #     slice<-subset(df,latRng[1] & Lat <= latRng[2] &
-  #                     Lon >= LonRng[1] & Lon <= LonRng[2] &
-  #                     Make==input$inMake  & Year>=input$inYear[1] & Year<=input$inYear[2] & Price>=(input$inPrice[1]*1000) & Price<=(input$inPrice[2]*1000) )  
-  #   }else if (input$inMake!='All' & input$inModel!='All'){
-  #     slice<-subset(df,latRng[1] & Lat <= latRng[2] &
-  #                     Lon >= LonRng[1] & Lon <= LonRng[2] &
-  #                     Make==input$inMake & Model==input$inModel & Year>=input$inYear[1] & Year<=input$inYear[2] & Price>=(input$inPrice[1]*1000) & Price<=(input$inPrice[2]*1000))  
-  #   }
-  #   
-  # })
+  df_slice<-reactive({
+    bounds <- input$plotmap_bounds
+    latRng <- range(bounds$north, bounds$south)
+    LonRng <- range(bounds$east, bounds$west)
+    print(c(latRng,LonRng))
+    if (input$inTribe=='All' ){
+      slice<-subset(df,Lat >= latRng[1] & Lat <= latRng[2] &
+                      Lon >= LonRng[1] & Lon <= LonRng[2] )
+    }else if (input$inMake!='All' ){
+      slice<-subset(df,latRng[1] & Lat <= latRng[2] &
+                      Lon >= LonRng[1] & Lon <= LonRng[2]) #&
+                      # Surname_neutral==input$inTribe)
+    }
+
+  })
   # 
   # #function Filter the data based on brush at the scatter plot
   # df_slice_b<-reactive({
@@ -167,9 +165,10 @@ server<-function(input, output,session) {
     #Draw individual marker per listing
     # if (input$inCluster==FALSE)
     # {
-      leafletProxy('plotmap',data=df) %>%
+      leafletProxy('plotmap',data=df_slice()) %>%
         clearShapes() %>%
         clearMarkers()%>%
+        #addWebGLHeatmap(lng=~Lon, lat=~Lat, size = 60000)
         clearMarkerClusters()%>%
         addCircleMarkers(
           ~Lat,
@@ -177,20 +176,10 @@ server<-function(input, output,session) {
           stroke=F,
           fillOpacity=.8,
           radius=4,
-          popup = ~paste(w)
-          #  '<strong>Manufacturer:</strong>', Make,
-          #                '</br><strong>Model:</strong>', Model,
-          #                '</br><strong>Year:</strong>', Year,
-          #                '</br><strong>Price:</strong>', Price,'AUD',
-          #                '</br><strong>URL:</strong>',  paste('<a href="',url,'" target="_blank">Go to Gumtree Listing</a>'),
-          #                '</br><strong>Odometer:</strong>', Km,
-          #                '</br><strong>Transmision:</strong>', Trans,
-          #                '</br><strong>Registraion:</strong>', Reg,
-          #                '</br><strong>Fuel:</strong>', Fuel,
-          #                '</br><strong>AC:</strong>', AC),
-          # color=~pal(PriceCluster)
+          popup = ~paste(w),
+          clusterOptions = markerClusterOptions()
         )
-    # }
+        # }
   })
   # 
   # 

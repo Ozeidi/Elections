@@ -1,4 +1,5 @@
 #install.packages('ggmap')
+Sys.setlocale("LC_CTYPE", locale="Arabic")
 options(warn=-1)
 library(tidyverse)
 library(ggmap)
@@ -33,9 +34,13 @@ for(i in 1:nrow(Address))
 # Some Wilayate were not available on Google Map Service and had to be geocoded manually, eg. Mahoot, Al Jazir
 Address %>% filter_all(any_vars(is.na(.))) 
 Address[rowSums(is.na(Address)) > 0,]
+#Convert geoAddress to character rather than factor
+Address$geoAddress <- as.character(Address$geoAddress)
 #Get Lat Long Manually from google Maps
-Address[48,3:5]= c(20.131995, 57.830014, 'Willayat Mahoot')
-Address[50,3:5]= c(18.548172, 55.857593, 'Willayat Al Jazir')
+Address[48,3:5] <- c(20.131995, 57.830014, 'Willayat Mahoot')
+Address[50,3:5] <- c(18.548172, 55.857593, 'Willayat Al Jazir')
+Address[34,3:5] <- list(22.9329, 57.7686, 'Willayat Izki')
+
 Address %>%  rename(Lon= lat, Lat = lon) -> Address
 # Write a CSV file containing origAddress to the working directory
 write.csv(Address, "geocoded.csv", row.names=FALSE)
@@ -44,7 +49,6 @@ Address <- read.csv('geocoded.csv')
 
 
 df %>%  group_by(wilaya_id,Surname_neutral) %>%  summarise(n()) -> df_grouped
-df_grouped %>% arrange(desc(`n()`))
-
+df_grouped %>% arrange(desc(`n()`)) %>% rename(n = `n()`) -> df_grouped
 
 
